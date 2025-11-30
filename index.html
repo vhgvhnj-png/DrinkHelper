@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>飲料小幫手</title>
+  <link rel="icon" type="image/png" href="./drink.png">
+  <link rel="apple-touch-icon" href="./icon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./icon.png">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+    
+    :root{
+      --bg:#fffef6; 
+      --accent:#ff7aa2; 
+      --muted:#6b6b6b; 
+      --card:#ffffff; 
+      --glass:rgba(255,255,255,0.85);
+      --radius:14px; 
+      --pad:16px; 
+      font-family: 'Noto Sans TC', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    }
+    *{box-sizing:border-box}
+    
+    body{
+      background:linear-gradient(160deg,#fffef6 0%, #f6fbff 100%);
+      background-image: url('https://images.unsplash.com/photo-1542444590-4c2250d4f29e?crop=entropy&cs=tinysrgb&fit=max&w=1600&h=900&q=80');
+      background-size: cover;
+      background-position: center center;
+      background-attachment: fixed;
+      margin:0; padding:28px; color:#222;
+    }
+    .wrap{max-width:900px; margin:0 auto}
+
+    header{display:flex; align-items:center; gap:12px; margin-bottom:18px}
+    .logo{
+      width:56px;
+      height:56px;
+      border-radius:12px;
+      background: linear-gradient(135deg, #ff7aa2, #ffd98a);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:700;
+      color:white;
+      font-size:20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+    h1{margin:0; font-size:20px}
+    p.lead{margin:4px 0 0; color:var(--muted); font-size:13px}
+
+    .card{
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: var(--radius);
+      padding: var(--pad);
+      box-shadow: 0 6px 20px rgba(20,30,50,0.06);
+      backdrop-filter: blur(8px);
+    }
+    form.controls{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:12px}
+    label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px}
+    select, input[type=text]{
+      width:100%; 
+      padding:10px 12px; 
+      border-radius:10px; 
+      border:1px solid #eef2f5; 
+      background:var(--glass);
+      backdrop-filter: blur(6px);
+    }
+    .note{font-size:12px; color:var(--muted); margin-top:8px}
+
+    .actions{display:flex; gap:10px; margin-top:10px}
+    button{border:0; padding:10px 14px; border-radius:12px; cursor:pointer}
+    .btn-primary{
+      background: linear-gradient(90deg, var(--accent), #ffb48a);
+      color: white;
+      font-weight: 600;
+      transition: background 0.3s;
+    }
+    .btn-primary:hover{
+      background: linear-gradient(90deg, #ffb48a, var(--accent));
+    }
+    .btn-clear{background:transparent; color:var(--muted)}
+
+    .result{margin-top:18px}
+    table{width:100%; border-collapse:collapse; text-align:left}
+    th,td{padding:12px 10px; border-bottom:1px dashed #f0f0f0}
+    th{font-size:13px; color:var(--muted)}
+    td .shop{display:block; font-weight:700}
+    td .small{font-size:13px; color:var(--muted)}
+
+    .error{color:#b30000; font-weight:700; margin-top:6px}
+    .hint{font-size:12px; color:#b47;}
+
+    @media (max-width:720px){
+      form.controls{grid-template-columns:1fr} 
+      header{gap:8px} 
+      .logo{width:48px;height:48px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo">飲</div>
+      <div>
+        <h1>飲料小幫手</h1>
+        <p class="lead">輸入當天天氣 / 身體狀況 / 情緒，我會快速給你 3 個健康又好喝的飲料提案</p>
+      </div>
+    </header>
+
+    <section class="card">
+      <form id="prefs" class="controls" onsubmit="return false;">
+        <div>
+          <label for="weather">天氣（必填）</label>
+          <select id="weather" aria-label="天氣選擇">
+            <option value="">請選擇天氣</option>
+            <option value="hot">熱（悶 / 炎熱）</option>
+            <option value="cool">涼（微涼 / 舒爽）</option>
+            <option value="cold">冷（寒冷）</option>
+            <option value="rain">下雨 / 潮濕</option>
+          </select>
+          <div id="err-weather" class="error" aria-live="polite" style="display:none">! 請選擇天氣以便我給出合適建議。</div>
+        </div>
+
+        <div>
+          <label for="body">身體狀況（必填）</label>
+          <select id="body">
+            <option value="">請選擇身體狀況</option>
+            <option value="normal">正常、想清爽</option>
+            <option value="tired">疲倦、想提神</option>
+            <option value="sore_throat">喉嚨不適 / 想養護</option>
+            <option value="digestive">腸胃較敏感 / 想溫和</option>
+          </select>
+          <div id="err-body" class="error" style="display:none">! 請選擇身體狀況，安全第一。</div>
+        </div>
+
+        <div>
+          <label for="mood">情緒 / 能量（必填）</label>
+          <select id="mood">
+            <option value="">請選擇情緒</option>
+            <option value="happy">愉快 / 想放鬆</option>
+            <option value="stressed">緊張 / 壓力大</option>
+            <option value="sad">情緒低落</option>
+            <option value="calm">平靜 / 冥想</option>
+          </select>
+          <div id="err-mood" class="error" style="display:none">! 請選擇情緒，這會影響口味建議。</div>
+        </div>
+
+      </form>
+
+      <div class="actions">
+        <button class="btn-primary" id="generate">產生 3 個建議</button>
+        <button class="btn-clear" id="reset">清除</button>
+      </div>
+
+      <div class="result" id="resultArea" aria-live="polite"></div>
+
+    </section>
+
+  </div>
+
+  <script>
+    const generateBtn = document.getElementById('generate');
+    const resetBtn = document.getElementById('reset');
+    const resultArea = document.getElementById('resultArea');
+
+    function showError(id, show){
+      const el = document.getElementById(id);
+      el.style.display = show ? 'block' : 'none';
+    }
+
+    function mapSuggestions({weather, body, mood}){
+      const suggestions = [];
+
+      let a = {name:'', shop:'', add:'', reason:''};
+      if(weather === 'hot' || mood === 'happy'){
+        a.name = '檸檬氣泡冰茶'; a.shop = 'CoCo / 50嵐 / 在地手搖'; a.add = '+20 TWD';
+        a.reason = '清爽解膩、補充口感之餘熱天解渴。若有腸胃問題可選無糖或微糖。';
+      } else if(weather === 'rain' || weather === 'cool'){
+        a.name = '水果茶（溫）'; a.shop = '茶湯會 / 一芳'; a.add = '+15 TWD';
+        a.reason = '溫熱的水果香能帶來舒適感，適合微涼或下雨天。';
+      } else {
+        a.name = '經典拿鐵（熱 / 冰可選）'; a.shop = 'City Cafe / 85度C'; a.add = '+30 TWD';
+        a.reason = '溫暖又有暖胃效果，對於平常想要溫和提神的人合適。';
+      }
+      suggestions.push(a);
+
+      let b = {name:'', shop:'', add:'', reason:''};
+      if(body === 'sore_throat'){
+        b.name = '蜂蜜檸檬溫飲'; b.shop = '手作茶館 / 小攤手搖'; b.add = '+25 TWD';
+        b.reason = '天然蜂蜜有舒緩效果，溫飲可以保護喉嚨。';
+      } else if(body === 'digestive'){
+        b.name = '溫薑茶或紅棗茶（熱）'; b.shop = '傳統飲品店 / 小農茶室'; b.add = '+0 TWD';
+        b.reason = '溫和助消化、安撫腸胃。避免加冰或過多乳製品。';
+      } else {
+        b.name = '低糖烏龍茶（去冰）'; b.shop = '在地茶飲店'; b.add = '+0 TWD';
+        b.reason = '茶葉單純、較少添加物，適合想照護身體但又想喝茶的人。';
+      }
+      suggestions.push(b);
+
+      let c = {name:'', shop:'', add:'', reason:''};
+      if(body === 'tired' || mood === 'stressed'){
+        c.name = '微糖美式 / 拿鐵（冰或熱）'; c.shop = '星巴克 / 連鎖咖啡'; c.add = '+40 TWD';
+        c.reason = '咖啡因溫和提神，微糖可避免血糖大起大落。';
+      } else {
+        c.name = '燕麥奶拿鐵（低糖）'; c.shop = '獨立咖啡館 / 連鎖'; c.add = '+45 TWD';
+        c.reason = '植物奶較暖和且溫順，適合想要持續能量但不想太刺激的人。';
+      }
+      suggestions.push(c);
+
+      return suggestions;
+    }
+
+    function renderTable(items){
+      const html = [];
+      html.push('<table>');
+      html.push('<thead><tr><th>飲料（店家）</th><th>加價</th><th>建議理由</th></tr></thead>');
+      html.push('<tbody>');
+      items.forEach(it => {
+        html.push(`<tr>` +
+                  `<td><span class="shop">${escapeHtml(it.name)}</span><span class="small">${escapeHtml(it.shop)}</span></td>` +
+                  `<td>${escapeHtml(it.add)}</td>` +
+                  `<td>${escapeHtml(it.reason)}</td>` +
+                  `</tr>`);
+      });
+      html.push('</tbody></table>');
+      return html.join('\n');
+    }
+
+    function escapeHtml(s){
+      if(!s) return '';
+      return s.replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]; });
+    }
+
+    generateBtn.addEventListener('click', ()=>{
+      const weather = document.getElementById('weather').value;
+      const body = document.getElementById('body').value;
+      const mood = document.getElementById('mood').value;
+
+      let ok = true;
+      if(!weather){ showError('err-weather', true); ok = false; } else showError('err-weather', false);
+      if(!body){ showError('err-body', true); ok = false; } else showError('err-body', false);
+      if(!mood){ showError('err-mood', true); ok = false; } else showError('err-mood', false);
+
+      if(!ok){ resultArea.innerHTML = '<p class="error">! 表單有缺項，請依照上方提示補完欄位。</p>'; return; }
+
+      const suggestions = mapSuggestions({weather, body, mood});
+      resultArea.innerHTML = renderTable(suggestions);
+    });
+
+    resetBtn.addEventListener('click', ()=>{
+      document.getElementById('prefs').reset();
+      showError('err-weather', false); showError('err-body', false); showError('err-mood', false);
+      resultArea.innerHTML = '';
+    });
+
+    document.querySelectorAll('.error').forEach(e=>e.style.display='none');
+  </script>
+</body>
+</html>
