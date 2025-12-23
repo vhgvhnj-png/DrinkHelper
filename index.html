@@ -104,7 +104,7 @@
       <div class="logo">飲</div>
       <div>
         <h1>飲料小幫手</h1>
-        <p class="lead">輸入當天天氣 / 身體狀況 / 情緒，我會快速給你 3 個健康又好喝的飲料提案</p>
+        <p class="lead">輸入當天天氣 / 身體狀況 / 情緒，我會給你 3 個好喝的飲料提案</p>
       </div>
     </header>
 
@@ -160,102 +160,126 @@
   </div>
 
   <script>
-    const generateBtn = document.getElementById('generate');
-    const resetBtn = document.getElementById('reset');
-    const resultArea = document.getElementById('resultArea');
+  // 1. 完整飲料資料庫
+  const DRINK_DATABASE = [
+    { name: '檸檬春烏龍', shop: '可不可', price: 'M 45 / L 55', tags: { weather: ['hot', 'rain'], body: ['normal'], mood: ['happy', 'calm'] } },
+    { name: '熟成紅茶', shop: '可不可', price: 'M 25 / L 30', tags: { weather: ['cool', 'cold'], body: ['normal'], mood: ['calm'] } },
+    { name: '白玉歐蕾', shop: '可不可', price: 'M 50 / L 60', tags: { weather: ['cool'], body: ['tired'], mood: ['sad', 'stressed'] } },
+    { name: '8 冰茶', shop: '50 嵐', price: 'M 50 / L 60', tags: { weather: ['hot'], body: ['normal', 'digestive'], mood: ['happy'] } },
+    { name: '四季春珍波椰', shop: '50 嵐', price: 'M 40 / L 50', tags: { weather: ['hot', 'cool'], body: ['tired'], mood: ['happy'] } },
+    { name: '楊枝甘露 2.0', shop: '麻古茶坊', price: 'L 80', tags: { weather: ['hot'], body: ['normal'], mood: ['happy', 'sad'] } },
+    { name: '金桔檸檬', shop: '麻古茶坊', price: 'L 55', tags: { weather: ['cool', 'rain'], body: ['sore_throat'], mood: ['calm'] } },
+    { name: '薑汁桂花奶茶', shop: '萬波', price: 'M 50 / L 60', tags: { weather: ['cold'], body: ['sore_throat', 'digestive'], mood: ['calm'] } },
+    { name: '芋頭牛奶', shop: '迷客夏', price: 'M 65', tags: { weather: ['cool', 'cold'], body: ['tired'], mood: ['sad'] } },
+    { name: '決明大麥', shop: '迷客夏', price: 'M 30 / L 35', tags: { weather: ['hot', 'rain'], body: ['digestive'], mood: ['calm'] } }
+  ];
 
-    function showError(id, show){
-      const el = document.getElementById(id);
-      el.style.display = show ? 'block' : 'none';
+  const generateBtn = document.getElementById('generate');
+  const resultArea = document.getElementById('resultArea');
+
+  // 2. 核心邏輯：計算規格 (冰、糖、加料)
+  function getDrinkAdvice(prefs) {
+    let ice = "微冰", sugar = "微糖", topping = "不建議加料";
+
+    // 冰量邏輯
+    if (prefs.body === 'sore_throat' || prefs.body === 'digestive' || prefs.weather === 'cold') ice = "熱飲/溫飲";
+    else if (prefs.weather === 'hot') ice = "少冰/微冰";
+    else ice = "去冰";
+
+    // 甜度邏輯
+    if (prefs.body === 'tired' || prefs.mood === 'sad') sugar = "半糖 (補充能量)";
+    else if (prefs.body === 'digestive') sugar = "無糖 (輕負擔)";
+    else sugar = "微糖";
+
+    // 加料邏輯 (New!)
+    if (prefs.body === 'sore_throat' || prefs.body === 'digestive') {
+      topping = "建議不加 (或選仙草/愛玉較軟好消化)";
+    } else if (prefs.mood === 'stressed') {
+      topping = "波霸、珍珠、寒天 (嚼勁十足超紓壓)";
+    } else if (prefs.mood === 'sad' || prefs.body === 'tired') {
+      topping = "布丁、奶蓋、芋泥 (綿密口感帶來幸福感)";
+    } else if (prefs.mood === 'happy') {
+      topping = "椰果、蘆薈、茶凍 (清爽彈牙口感)";
+    } else {
+      topping = "珍珠、小粉圓 (經典國民組合)";
     }
 
-    function mapSuggestions({weather, body, mood}){
-      const suggestions = [];
+    return { ice, sugar, topping };
+  }
 
-      let a = {name:'', shop:'', add:'', reason:''};
-      if(weather === 'hot' || mood === 'happy'){
-        a.name = '檸檬氣泡冰茶'; a.shop = 'CoCo / 50嵐 / 在地手搖'; a.add = '+20 TWD';
-        a.reason = '清爽解膩、補充口感之餘熱天解渴。若有腸胃問題可選無糖或微糖。';
-      } else if(weather === 'rain' || weather === 'cool'){
-        a.name = '水果茶（溫）'; a.shop = '茶湯會 / 一芳'; a.add = '+15 TWD';
-        a.reason = '溫熱的水果香能帶來舒適感，適合微涼或下雨天。';
-      } else {
-        a.name = '經典拿鐵（熱 / 冰可選）'; a.shop = 'City Cafe / 85度C'; a.add = '+30 TWD';
-        a.reason = '溫暖又有暖胃效果，對於平常想要溫和提神的人合適。';
-      }
-      suggestions.push(a);
+  function getSuggestions(prefs) {
+    let candidates = DRINK_DATABASE.map(drink => {
+      const matchW = drink.tags.weather.includes(prefs.weather);
+      const matchB = drink.tags.body.includes(prefs.body);
+      const matchM = drink.tags.mood.includes(prefs.mood);
+      const score = (matchW ? 3 : 0) + (matchB ? 5 : 0) + (matchM ? 2 : 0);
+      return { ...drink, score };
+    }).filter(d => d.score >= 3);
 
-      let b = {name:'', shop:'', add:'', reason:''};
-      if(body === 'sore_throat'){
-        b.name = '蜂蜜檸檬溫飲'; b.shop = '手作茶館 / 小攤手搖'; b.add = '+25 TWD';
-        b.reason = '天然蜂蜜有舒緩效果，溫飲可以保護喉嚨。';
-      } else if(body === 'digestive'){
-        b.name = '溫薑茶或紅棗茶（熱）'; b.shop = '傳統飲品店 / 小農茶室'; b.add = '+0 TWD';
-        b.reason = '溫和助消化、安撫腸胃。避免加冰或過多乳製品。';
-      } else {
-        b.name = '低糖烏龍茶（去冰）'; b.shop = '在地茶飲店'; b.add = '+0 TWD';
-        b.reason = '茶葉單純、較少添加物，適合想照護身體但又想喝茶的人。';
-      }
-      suggestions.push(b);
+    return candidates.sort((a, b) => b.score - a.score).sort(() => 0.5 - Math.random()).slice(0, 3);
+  }
 
-      let c = {name:'', shop:'', add:'', reason:''};
-      if(body === 'tired' || mood === 'stressed'){
-        c.name = '微糖美式 / 拿鐵（冰或熱）'; c.shop = '星巴克 / 連鎖咖啡'; c.add = '+40 TWD';
-        c.reason = '咖啡因溫和提神，微糖可避免血糖大起大落。';
-      } else {
-        c.name = '燕麥奶拿鐵（低糖）'; c.shop = '獨立咖啡館 / 連鎖'; c.add = '+45 TWD';
-        c.reason = '植物奶較暖和且溫順，適合想要持續能量但不想太刺激的人。';
-      }
-      suggestions.push(c);
+  function renderTable(items, advice) {
+    if (items.length === 0) return '<p class="hint">找不到匹配建議，請嘗試更換條件。</p>';
+    
+    let html = `
+      <table>
+        <thead>
+          <tr>
+            <th>飲料品項</th>
+            <th>黃金比例</th>
+            <th>加料建議</th>
+          </tr>
+        </thead>
+        <tbody>`;
 
-      return suggestions;
-    }
-
-    function renderTable(items){
-      const html = [];
-      html.push('<table>');
-      html.push('<thead><tr><th>飲料（店家）</th><th>加價</th><th>建議理由</th></tr></thead>');
-      html.push('<tbody>');
-      items.forEach(it => {
-        html.push(`<tr>` +
-                  `<td><span class="shop">${escapeHtml(it.name)}</span><span class="small">${escapeHtml(it.shop)}</span></td>` +
-                  `<td>${escapeHtml(it.add)}</td>` +
-                  `<td>${escapeHtml(it.reason)}</td>` +
-                  `</tr>`);
-      });
-      html.push('</tbody></table>');
-      return html.join('\n');
-    }
-
-    function escapeHtml(s){
-      if(!s) return '';
-      return s.replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]; });
-    }
-
-    generateBtn.addEventListener('click', ()=>{
-      const weather = document.getElementById('weather').value;
-      const body = document.getElementById('body').value;
-      const mood = document.getElementById('mood').value;
-
-      let ok = true;
-      if(!weather){ showError('err-weather', true); ok = false; } else showError('err-weather', false);
-      if(!body){ showError('err-body', true); ok = false; } else showError('err-body', false);
-      if(!mood){ showError('err-mood', true); ok = false; } else showError('err-mood', false);
-
-      if(!ok){ resultArea.innerHTML = '<p class="error">! 表單有缺項，請依照上方提示補完欄位。</p>'; return; }
-
-      const suggestions = mapSuggestions({weather, body, mood});
-      resultArea.innerHTML = renderTable(suggestions);
+    items.forEach(it => {
+      html += `
+        <tr>
+          <td>
+            <span class="shop">${escapeHtml(it.name)}</span>
+            <span class="small">${escapeHtml(it.shop)} | ${it.price}</span>
+          </td>
+          <td>
+            <b style="color:var(--accent)">${advice.sugar}</b><br>
+            <span class="small">${advice.ice}</span>
+          </td>
+          <td style="font-size: 13px; color: #d63384; font-weight: 500;">
+            ${advice.topping}
+          </td>
+        </tr>`;
     });
 
-    resetBtn.addEventListener('click', ()=>{
-      document.getElementById('prefs').reset();
-      showError('err-weather', false); showError('err-body', false); showError('err-mood', false);
-      resultArea.innerHTML = '';
-    });
+    html += `</tbody></table><p class="hint">💡 小撇步：若當天腸胃較弱，建議避開波霸等較硬的配料喔！</p>`;
+    return html;
+  }
 
-    document.querySelectorAll('.error').forEach(e=>e.style.display='none');
-  </script>
+  function escapeHtml(s) {
+    return s ? s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c])) : '';
+  }
+
+  generateBtn.addEventListener('click', () => {
+    const prefs = {
+      weather: document.getElementById('weather').value,
+      body: document.getElementById('body').value,
+      mood: document.getElementById('mood').value
+    };
+
+    if (!prefs.weather || !prefs.body || !prefs.mood) {
+      resultArea.innerHTML = '<p class="error">！請選擇所有狀態。</p>';
+      return;
+    }
+
+    const suggestions = getSuggestions(prefs);
+    const advice = getDrinkAdvice(prefs);
+    resultArea.innerHTML = renderTable(suggestions, advice);
+  });
+
+  document.getElementById('reset').addEventListener('click', () => {
+    document.getElementById('prefs').reset();
+    resultArea.innerHTML = '';
+  });
+</script>
 </body>
 </html>
 
